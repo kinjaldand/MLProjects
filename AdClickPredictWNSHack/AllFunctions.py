@@ -303,3 +303,13 @@ def plot_corr(df,size=10):
     ax.matshow(corr)
     plt.xticks(range(len(corr.columns)), corr.columns, rotation='vertical')
     plt.yticks(range(len(corr.columns)), corr.columns)   
+	
+	
+	
+def GetClassWeights(y_train):
+	from sklearn.utils import class_weight
+	class_weights = class_weight.compute_class_weight('balanced',
+                                                 np.unique(y_train),
+                                                 y_train)
+	return class_weights	
+	

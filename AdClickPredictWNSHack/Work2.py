@@ -60,21 +60,22 @@ train_test_data.to_csv('train_test_data.csv',index=False)
 def calcAllOutputs(df):
 	visit_count = len(df)
 	total_sessions = len(np.unique(df['session_id']))
-	total_items = len(np.unique(df['item_id']))
-	total_category_1 = len(np.unique(df['category_1']))
-	total_category_2 = len(np.unique(df['category_2']))
-	total_category_3 = len(np.unique(df['category_3']))
-	total_product_type = len(np.unique(df['product_type']))
+	total_items = len(np.unique(df['item_id']))/visit_count
+	total_category_1 = len(np.unique(df['category_1']))/visit_count
+	total_category_2 = len(np.unique(df['category_2']))/visit_count
+	total_category_3 = len(np.unique(df['category_3']))/visit_count
+	total_product_type = len(np.unique(df['product_type']))/visit_count
 	
 	item_price_max = np.max(df['item_price_log'])
 	item_price_min = np.min(df['item_price_log'])
 	item_price_avg = np.mean(df['item_price_log'])
 	item_price_std = np.std(df['item_price_log'])
+	item_price_rng = item_price_max - item_price_min
 	max_time=np.max(df['server_time'])
 	impid=np.max(df['impression_id'])
 	#diff = df['impression_time'] - max_time
 	#diff1 = diff.total_seconds()
-	res=[impid,visit_count,total_sessions ,total_items ,total_category_1 ,total_category_2 ,total_category_3 ,total_product_type ,item_price_max ,item_price_min ,item_price_avg ,item_price_std ,max_time]
+	res=[impid,visit_count,total_sessions ,total_items ,total_category_1 ,total_category_2 ,total_category_3 ,total_product_type ,item_price_max ,item_price_min ,item_price_avg ,item_price_std ,item_price_rng,max_time]
 	return res
 	
 def calcImpFeatures(df):
@@ -97,7 +98,7 @@ def applymathfloor(x):
 
 dfC=train_test_data.merge(log_item_data,on='user_id')
 print(len(dfC))
-dfC2 = dfC[(dfC.server_time < dfC.impression_time)]
+dfC2 = dfC[(dfC.server_time <= dfC.impression_time) & (dfC.server_time >= dfC.impression_time_7less)]
 print(len(dfC2))
 dfCHead=dfC2.head(100)
 
@@ -105,7 +106,7 @@ dfCHead=dfC2.head(100)
 dfC3=dfC2.groupby('impression_id').apply(calcAllOutputs)
 
 dfFeatureset1=pd.DataFrame.from_records(dfC3)
-dfFeatureset1.columns=['impression_id','visit_count','total_sessions','total_items','total_category_1','total_category_2','total_category_3','total_product_type','item_price_max ','item_price_min','item_price_avg','item_price_std','max_time']
+dfFeatureset1.columns=['impression_id','visit_count','total_sessions','total_items','total_category_1','total_category_2','total_category_3','total_product_type','item_price_max','item_price_min','item_price_avg','item_price_std','item_price_rng','max_time']
 dfFeatureset1.to_csv('dfFeatureset1.csv',index=False)
 
 dfC=train_test_data.merge(train_test_data[['user_id','impression_time','app_code']],on='user_id',suffixes=('', '_y'))
@@ -141,7 +142,7 @@ train_test_data=mergeddf
 
 s=train_test_data.app_code.value_counts()
 s=s/len(train_test_data)
-train_test_data['app_id']=train_test_data['app_code'].apply(lambda x: s[x])
+train_test_data['app_imp']=train_test_data['app_code'].apply(lambda x: s[x])
 
 
 train_test_data['diff_days']=(train_test_data['diff1']/3600/24).apply(applymathfloor)
@@ -149,12 +150,12 @@ train_test_data['diff_days']=(train_test_data['diff1']/3600/24).apply(applymathf
 #train_test_data['diff_mins']=(train_test_data['diff1']/60).apply(applymathfloor)
 #train_test_data['diff_secs']=(train_test_data['diff1']).apply(applymathfloor)
 
-#train_test_data['prev_diff_days']=(train_test_data['diff2']/3600/24).apply(applymathfloor)
-train_test_data['prev_diff_hours']=(train_test_data['diff2']/3600).apply(applymathfloor)
+train_test_data['prev_diff_days']=(train_test_data['diff2']/3600/24).apply(applymathfloor)
+#train_test_data['prev_diff_hours']=(train_test_data['diff2']/3600).apply(applymathfloor)
 #train_test_data['prev_diff_mins']=(train_test_data['diff2']/60).apply(applymathfloor)
 #train_test_data['prev_diff_secs']=(train_test_data['diff2']).apply(applymathfloor)
-#train_test_data['prev_app_diff_days']=(train_test_data['diff3']/3600/24).apply(applymathfloor)
-train_test_data['prev_app_diff_hours']=(train_test_data['diff3']/3600).apply(applymathfloor)
+train_test_data['prev_app_diff_days']=(train_test_data['diff3']/3600/24).apply(applymathfloor)
+#train_test_data['prev_app_diff_hours']=(train_test_data['diff3']/3600).apply(applymathfloor)
 #train_test_data['prev_app_diff_mins']=(train_test_data['diff3']/60).apply(applymathfloor)
 #train_test_data['prev_app_diff_secs']=(train_test_data['diff3']).apply(applymathfloor)
 
@@ -172,12 +173,12 @@ train_test_data=af.LabelEncodeCols(train_test_data.copy(),onehotColumns=[], cate
 
 train_test_data.to_csv("train_test_dataAll.csv",index=False)
 
-
+#train_test_data=pd.read_csv('train_test_dataAll.csv')
 X=train_test_data 
 #af.plot_corr(X)
-#X=X.drop(columns=[x  for x in dfFeatureset1.columns if x in X.columns])   
-X=X.drop(columns=['previous_imp_app_count','prev_app_diff_hours'])
-X=X.drop(columns=['total_category_2','total_category_3','total_sessions', 'item_price_min','item_price_max ','item_price_std'])
+# dropping correlated variables   
+X=X.drop(columns=['previous_imp_app_count','prev_app_diff_days'])
+X=X.drop(columns=['total_category_1','total_category_2','total_category_3','total_sessions', 'item_price_min','item_price_max','item_price_std'])
 X=X.drop(columns=['total_product_type','visit_count'])
 print(X.columns)
 pred_variable_type = "categorical"
@@ -207,16 +208,15 @@ trainVal_frame=X_trainVal
 x_cols=list(X_trainVal.columns)
 y_col=target_variable
 trainVal_frame[target_variable] = trainVal_frame[target_variable].astype(np.uint8)
-	
+class_weights=af.GetClassWeights(trainVal_frame[target_variable])	
+trainVal_frame['class_weights'] =[class_weights[x] for x in trainVal_frame[target_variable]]
 import H2OHandler as hh 
-
+# h2o.cluster().shutdown(prompt=True)
 print("Start H2O model training")
 
 #H2o internally uses k-fold cross validation
-res,PredDF,predtrain=hh.GetBestH2OModel(trainVal_frame,x_cols,y_col,pred_variable_type == "categorical",X_test)
-allscores=af.GetScores(train_data[target_variable],predtrain['predict'],['NO','YES'])
-#Best model scores on entire available train set
-print(allscores[4],allscores[9])
+res,PredDF,predtrain,ptrain=hh.GetBestH2OModel(trainVal_frame,x_cols,y_col,pred_variable_type == "categorical",X_test,weights_column='class_weights',stopping_metric='AUC')
+
 TrainCleanVars['H2OBestModel']=res.leader
 X_test[target_variable]=PredDF['predict']
 X_test[standarizeCols]=scaler.inverse_transform(X_test[standarizeCols])
@@ -235,7 +235,7 @@ import h2o
 
 m = h2o.get_model(lb[0,"model_id"])
 varimpres=m.varimp(use_pandas=True)
-
+lbscores=lb.head(rows=lb.nrows).as_data_frame()
 
 
 
